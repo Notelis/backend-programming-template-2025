@@ -5,7 +5,10 @@ const { passwordMatched } = require('../../../utils/password');
 const { getUserByEmail } = require('./users-repository');
 async function getUsers(request, response, next) {
   try {
-    const users = await usersService.getUsers();
+
+    const { limit = 0, offset = 0 } = request.query;
+    
+    const users = await usersService.getUsers({ limit, offset });
 
     return response.status(200).json(users);
   } catch (error) {
