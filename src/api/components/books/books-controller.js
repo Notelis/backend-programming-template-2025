@@ -3,13 +3,17 @@ const { errorResponder, errorTypes } = require('../../../core/errors');
 
 async function getBooks(request, response, next) {
   try {
-    const books = await booksService.getBooks();
+    const { limit = 0, offset = 0 } = request.query;
 
+    const books = await booksService.getBooks({ limit, offset });
+
+    // Return the books
     return response.status(200).json(books);
   } catch (error) {
     return next(error);
   }
 }
+
 
 async function createBook(request, response, next) {
   try {
