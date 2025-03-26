@@ -1,7 +1,8 @@
 const usersService = require('./users-service');
 const { errorResponder, errorTypes } = require('../../../core/errors');
 const { hashPassword } = require('../../../utils/password');
-
+const { passwordMatched } = require('../../../utils/password');
+const { getUserByEmail } = require('./users-repository');
 async function getUsers(request, response, next) {
   try {
     const users = await usersService.getUsers();
@@ -147,12 +148,57 @@ async function updateUser(request, response, next) {
 
 async function changePassword(request, response, next) {
   // TODO: Implement this function
-  // const id = request.params.id;
-  // const {
-  //   old_password: oldPassword,
-  //   new_password: newPassword,
-  //   confirm_new_password: confirmNewPassword,
-  // } = request.body;
+  try {
+   const id = request.params.id;
+   const {
+     old_password: oldPassword,
+     new_password: newPassword,
+     confirm_new_password: confirmNewPassword,
+   } = request.body;
+
+   if (!id) {
+    throw errorResponder(errorTypes.UNPROCESSABLE_ENTITY, 'User not found');
+   }
+
+   const user = await usersService.getUser(request.params.id);
+
+   if (!passwordMatched(oldPassword, user.password)) {
+    throw errorResponder(
+      errorTypes.VALIDATION_ERROR,
+      'Old password is incorrect'
+    );
+   };
+
+   if (newPassword.length < 8) {
+    throw errorResponder(
+      errorTypes.VALIDATION_ERROR,
+      'Password must be at least 8 characters long'
+    );
+   };
+
+   if (newPassword !== confirmNewPassword) {
+    throw errorResponder(
+      errorTypes.VALIDATION_ERROR,
+      'New password and new confirm password do not match'
+    );
+   };
+   
+   const hashedPassword = await hashPassword(password);
+
+   const success = await usersService.changePassword(
+    request.params.id,
+    hashPassword
+  );
+
+  
+  if (!success) {
+    throw errorResponder(
+      errorTypes.UNPROCESSABLE_ENTITY,
+      'Failed to update user'
+    );
+  }
+
+   return response.status(200).json({ message: "Password changed successfully" });
   //
   // Make sure that:
   // - the user exists by checking the user ID
@@ -171,7 +217,9 @@ async function changePassword(request, response, next) {
   //
   // If all conditions are met, update the user's password and return
   // a success response.
-  return next(errorResponder(errorTypes.NOT_IMPLEMENTED));
+  } catch(error) {
+    return next(error);
+  };
 }
 
 async function deleteUser(request, response, next) {
@@ -191,6 +239,43 @@ async function deleteUser(request, response, next) {
   }
 }
 
+async function loginUser(request, response, next) {
+  try {
+    const {
+      email,
+      password
+    } = request.body;
+
+    if (!email || !password) {
+      throw errorResponder(
+        errorTypes.VALIDATION_ERROR,
+        'Email and password is required'
+      );
+    };
+    
+    const user = await getUserByEmail(email);
+
+    if (!user) {
+      return response.status(403).json({
+        error: 'Email is wrong'
+      });
+    }
+
+    const isPasswordCorrect = await passwordMatched(password, user.password); // Memastikan perbandingan dengan hashed password
+
+    if (!isPasswordCorrect) {
+      return response.status(403).json({
+        error: 'Password is wrong'
+      });
+    }
+
+    return response.status(200).json({ message: 'User login successful' });
+
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getUsers,
   getUser,
@@ -198,4 +283,5 @@ module.exports = {
   updateUser,
   changePassword,
   deleteUser,
+  loginUser
 };
